@@ -12,3 +12,5 @@ json
 
 ### Response
 * 'state': 'tle', 'error', 'compile error', 'success'
+* 'stdout': stdout
+* 'stderr': stderr
