@@ -168,6 +168,10 @@ while True:
         continue
 
     if stage == 'compile':
+        try:
+            shutil.rmtree(dirpath)
+        except Exception as e:
+            print ' Error: Cannot remove dir.', e
         conn.sendall(json.dumps({
             'state': 'success',
             'stdout': result['stdout'],
@@ -204,4 +208,9 @@ while True:
         'stderr': result['stderr']
     }))
     conn.close()
+
+    try:
+        shutil.rmtree(dirpath)
+    except Exception as e:
+        print ' Error: Cannot remove dir.', e
 
