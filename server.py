@@ -53,6 +53,8 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind((HOST, PORT))
 
+supportType = ['text/x-c++src', 'text/x-python']
+
 while True:
     s.listen(5) #maximum number of queued connections
 
@@ -96,7 +98,7 @@ while True:
     if filetype is None:
         continue
 
-    if filetype != 'text/x-c++src':
+    if filetype not in supportType:
         print ' Bad req: not supported.', D['mime']
         conn.sendall(json.dumps({
             'state': 'error',
@@ -136,44 +138,48 @@ while True:
         continue
 
     #compile
-    command = './compile_cpp.sh -v ' + dirpath + ':' + '/data ' + fileName
-    result = execute(command, timeLimit = 5, extraMessage = 'Compile')
-    if result['state'] == 'tle':
-        conn.sendall(json.dumps({
-            'state': 'error',
-            'stderr': 'Compile time limit exceeded.'
-        }))
-        conn.close()
-        continue
-    elif result['stderr'] != '':
-        print 'Error:', result['stderr']
-        conn.sendall(json.dumps({
-            'state': 'compile error',
-            'stdout': result['stdout'],
-            'stderr': result['stderr']
-        }))
-        conn.close()
-        continue
+    if filetype != 'text/x-python':
+        command = './compile_cpp.sh -v ' + dirpath + ':' + '/data ' + fileName
+        result = execute(command, timeLimit = 5, extraMessage = 'Compile')
+        if result['state'] == 'tle':
+            conn.sendall(json.dumps({
+                'state': 'error',
+                'stderr': 'Compile time limit exceeded.'
+            }))
+            conn.close()
+            continue
+        elif result['stderr'] != '':
+            print 'Error:', result['stderr']
+            conn.sendall(json.dumps({
+                'state': 'compile error',
+                'stdout': result['stdout'],
+                'stderr': result['stderr']
+            }))
+            conn.close()
+            continue
 
-    if stage == 'compile':
-        try:
-            shutil.rmtree(dirpath)
-        except Exception as e:
-            print ' Error: Cannot remove dir.', e
-        conn.sendall(json.dumps({
-            'state': 'success',
-            'stdout': result['stdout'],
-            'stderr': result['stderr']
-        }))
-        conn.close()
-        continue
+        if stage == 'compile':
+            try:
+                shutil.rmtree(dirpath)
+            except Exception as e:
+                print ' Error: Cannot remove dir.', e
+            conn.sendall(json.dumps({
+                'state': 'success',
+                'stdout': result['stdout'],
+                'stderr': result['stderr']
+            }))
+            conn.close()
+            continue
 
-    while not os.path.isfile(dirpath + '/a.out') or not bool(os.stat(dirpath + '/a.out').st_mode & stat.S_IXUSR):
-        time.sleep(0.1)
+        while not os.path.isfile(dirpath + '/a.out') or not bool(os.stat(dirpath + '/a.out').st_mode & stat.S_IXUSR):
+            time.sleep(0.1)
 
     #run
-    command = './run_cpp.sh --stdin ' + dirpath + '/stdin.txt ' + '-m ' + str(memoryLimit) + ' ' + memoryLimitStrict + '-v ' + dirpath + ':' + '/data ' + '/data/a.out'
-    print command
+    if filetype == 'text/x-python':
+        command = './run_py.sh --stdin ' + dirpath + '/stdin.txt ' + '-m ' + str(memoryLimit) + ' ' + memoryLimitStrict + '-v '+ dirpath + ':' + '/data ' + '/data/' + fileName
+    else:
+        command = './run_cpp.sh --stdin ' + dirpath + '/stdin.txt ' + '-m ' + str(memoryLimit) + ' ' + memoryLimitStrict + '-v ' + dirpath + ':' + '/data ' + '/data/a.out'
+
     result = execute(command, timeLimit = runningTimeLimit + 4, extraMessage = 'Running')
     if result['state'] == 'tle':
         conn.sendall(json.dumps({
