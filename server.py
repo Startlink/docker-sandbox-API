@@ -33,6 +33,20 @@ def execute(commmand, timeLimit = 5, extraMessage = ''):
         'stderr': popen.stderr.read()
     }
 
+def getFromDict(key, D, default='', require=False, connection=None, errorMessage='', loggingMessage=None):
+    if key not in D:
+        if require:
+            if loggingMessage is not None:
+                print loggingMessage
+            conn.sendall(json.dumps({
+                'state': 'error',
+                'stderr': errorMessage
+            }))
+            conn.close()
+            return None
+        return default
+    return D[key]
+
 HOST = ''
 PORT = 3000
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -61,47 +75,27 @@ while True:
         conn.close()
         continue
 
-    if 'source' not in D:
-        #No 'source' key
-        print(' Error: No source code.')
-        conn.sendall(json.dumps({
-            'state': 'error',
-            'stderr': 'No source code'
-        }))
-        conn.close()
+    sourceCode = getFromDict(key='source', D=D, require=True, connection=conn, errorMessage='No source code', loggingMessage=' Error: No source code.')
+    if sourceCode is None:
         continue
-    sourceCode = D['source']
 
-    stdin = ''
-    if 'stdin' in D:
-        stdin = D['stdin']
+    stdin = getFromDict(key='stdin', D=D, default='')
 
-    fileName = 'a.cpp'
-    if 'name' in D:
-        fileName = D['name']
+    fileName = getFromDict(key='name', D=D, default='a.cpp')
 
-    runningTimeLimit = 5
-    if 'time_limit' in D:
-        runningTimeLimit = int(D['timeLimit'])
+    runningTimeLimit = int(getFromDict(key='time_limit', D=D, default=5))
 
-    memoryLimit = 128
-    if 'memory_limit' in D:
-        memoryLimit = int(D['memory_limit'])
+    memoryLimit = int(getFromDict(key='memory_limit', D=D, default=128))
 
     memoryLimitStrict = ''
-    if 'memory_limit_strict' in D and bool(D['memory_limit_strict']) == True:
+    if bool(getFromDict(key='memory_limit_strict', D=D, default=False)):
         memoryLimitStrict = '--strict '
 
-    if 'mime' not in D:
-        print ' Bad req: no file type.'
-        conn.sendall(json.dumps({
-            'state': 'error',
-            'stderr': 'no file type. specify \'mime\''
-        }))
-        conn.close()
+    filetype = getFromDict(key='mime', D=D, require=True, connection=conn,
+            errorMessage='The language is currently not supported', loggingMessage=' Bad req: no file type.')
+    if filetype is None:
         continue
 
-    filetype = D['mime']
     if filetype != 'text/x-c++src':
         print ' Bad req: not supported.', D['mime']
         conn.sendall(json.dumps({
@@ -111,18 +105,12 @@ while True:
         conn.close()
         continue
 
-    if 'stage' not in D:
-        print ' Bad req: no command.'
-        conn.sendall(json.dumps({
-            'state': 'error',
-            'stderr': 'Specify \'stage\''
-        }))
-        conn.close()
+    stage = getFromDict(key='stage', D=D, require=True, connection=conn,
+            errorMessage='Specify \'stage\'', loggingMessage=' Bad req: no stage')
+    if stage is None:
         continue
-
-    stage = D['stage']
     if stage != 'compile' and stage != 'run':
-        print ' Bad req: no stage.'
+        print ' Bad req: invalid stage.'
         conn.sendall(json.dumps({
             'state': 'error',
             'stderr': 'Invalid value in \'stage\''
@@ -185,6 +173,7 @@ while True:
 
     #run
     command = './run_cpp.sh --stdin ' + dirpath + '/stdin.txt ' + '-m ' + str(memoryLimit) + ' ' + memoryLimitStrict + '-v ' + dirpath + ':' + '/data ' + '/data/a.out'
+    print command
     result = execute(command, timeLimit = runningTimeLimit + 4, extraMessage = 'Running')
     if result['state'] == 'tle':
         conn.sendall(json.dumps({
