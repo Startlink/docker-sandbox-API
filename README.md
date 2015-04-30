@@ -7,8 +7,11 @@ json
 * 'stage':'compile' or 'run'
 * 'mime': 'text/x-c++src'
 * 'filename': source file name
-* 'stdin': string for stdin when you run the program
-* 'source': source string
+* 'stdin': stdin 문자열
+* 'source': 소스코드 문자열
+* 'time_limit': running time limit, 초 단위 (없으면 5초)
+* 'memory_limit': memory limit, MByte 단위 (없으면 128MB)
+* 'memory_limit_strict': true or false. (없으면 false) true이면 memory_limit만큼만 할당. (memory swap size 제한) false이면 memory_limit의 두 배.(swap size)
 
 ### Response
 * 'state': 'tle', 'error', 'compile error', 'success'
