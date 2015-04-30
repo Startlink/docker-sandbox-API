@@ -30,9 +30,9 @@ done
 if [ $strictMemory = 0 ]
 then
 	swapLimit=$(($memoryLimit * 2))
-	OUTPUT=$(cat $stdin | docker run -i -a stdin --net none --memory "$memoryLimit"m --memory-swap "$swapLimit"m -v $volume python python $* < $stdin)
+	OUTPUT=$(cat $stdin | docker run -i -a stdin --net none --memory "$memoryLimit"m --memory-swap "$swapLimit"m -v $volume python python3 $* < $stdin)
 else
-	OUTPUT=$(cat $stdin | docker run -i -a stdin --net none --memory "$memoryLimit"m --memory-swap "$memoryLimit"m -v $volume python python $* < $stdin)
+	OUTPUT=$(cat $stdin | docker run -i -a stdin --net none --memory "$memoryLimit"m --memory-swap "$memoryLimit"m -v $volume python python3 $* < $stdin)
 fi
 
 docker logs $OUTPUT
