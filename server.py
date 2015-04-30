@@ -48,7 +48,7 @@ def getFromDict(key, D, default='', require=False, connection=None, errorMessage
     return D[key]
 
 HOST = ''
-PORT = 3030
+PORT = 3000
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind((HOST, PORT))
