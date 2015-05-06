@@ -27,10 +27,8 @@ done
 
 if [ "$volume" = "" ]
 then
-	COMPILE=$(docker run -i -a stdin cpp g++ -o /data/$name $argv)
+	docker run cpp g++ -o /data/$name $argv
 else
-	COMPILE=$(docker run -i -a stdin -v $volume cpp g++ -o /data/$name $argv)
+	docker run -v $volume cpp g++ -o /data/$name $argv
 fi
-
-docker logs $COMPILE
 

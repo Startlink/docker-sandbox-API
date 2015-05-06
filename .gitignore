@@ -1,3 +1,7 @@
 docker_remove_exited.sh
 *.swp
 *.swo
+temp.*
+*.out
+*.cpp
+*.log
