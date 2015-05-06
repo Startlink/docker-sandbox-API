@@ -4,3 +4,4 @@ docker_remove_exited.sh
 temp.*
 *.out
 *.cpp
+*.log

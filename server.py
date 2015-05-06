@@ -7,6 +7,8 @@ from docker import Client
 import time
 import os
 import stat
+import logging
+import datetime
 
 def execute(commmand, timeLimit = 5, extraMessage = ''):
     kwargs = {
@@ -34,23 +36,23 @@ def execute(commmand, timeLimit = 5, extraMessage = ''):
         'stderr': popen.stderr.read()
     }
 
-def sendResponse(conn, res):
+def sendResponse(conn, state, stdout, stderr, logger):
+    res = json.dumps({ 'state': state, 'stdout': stdout, 'stderr': stderr })
     try:
         conn.sendall(res)
     except Exception as e:
-        print " > Failed to send the response.", e
+        logger.error('Failed to send the response. ' + str(e))
+    finally:
+        logger.debug(res)
 
-def getFromDict(key, D, default='', require=False, connection=None, errorMessage='', loggingMessage=None):
+def getFromDict(key, D, default='', errorMessage=None, logger=None):
     if key not in D:
-        if require:
-            if loggingMessage is not None:
-                print loggingMessage
-            sendResponse(conn, json.dumps({
-                'state': 'error',
-                'stdout': '',
-                'stderr': errorMessage
-            }))
-            conn.close()
+        if errorMessage is not None:
+            if logger is None:
+                print errorMessage
+            else:
+                logger.error(errorMessage)
+            sendResponse(conn, state='error', stdout='', stderr=errorMessage, logger=logger)
             return None
         return default
     return D[key]
@@ -62,124 +64,171 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind((HOST, PORT))
 
 supportType = ['text/x-c++src', 'text/x-python']
+#mime list for the languages that do not need compile:
+noCompileType = ['text/x-python']
+
+#Configure logger
+logger = logging.getLogger('sever')
+logger.setLevel(logging.DEBUG)
+
+fileHandler = logging.FileHandler('server_' + datetime.datetime.now().strftime('%Y%m%d%H%M%S') + '.log')
+fileHandler.setLevel(logging.WARNING)
+
+consoleHandler = logging.StreamHandler()
+consoleHandler.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fileHandler.setFormatter(formatter)
+consoleHandler.setFormatter(formatter)
+
+logger.addHandler(fileHandler)
+logger.addHandler(consoleHandler)
+
 
 while True:
     s.listen(5) #maximum number of queued connections
 
     conn, addr = s.accept()
-    print('Connected by', addr)
+
+    logger.info('Connected by ' + str(addr))
+
+    #Block ip except for our web server
     if addr[0] != '115.68.182.172':
-        sendResponse(conn, json.dumps({
-            'state': 'error',
-            'stdout': '',
-            'stderr': 'Connection refused'
-        }))
+        logger.warning('Unauthorized connection by ' + str(addr))
+
+        sendResponse(conn, state='error', stdout='', stderr='Connection refused', logger=logger)
         conn.close()
         continue
 
     data = conn.recv(1024)
     if not data:
         continue
+    logger.debug(str(data))
 
+    #JSON string to python dictionary
     try:
-        print data
         D = json.loads(data)
     except Exception as e:
         #JSON load failed
-        print ' > Error: Cannot load the received data as json.'
-        try:
-            sendResponse(conn, json.dumps({
-                'state': 'error',
-                'stderr': 'Not an appropriate data.'
-            }))
-            conn.close()
-        except:
-            pass
+        logger.error('Cannot load the received data as json. ', str(e))
+        sendResponse(conn, state='error', stdout='', stderr='Not an appropriate data.', logger=logger)
+        conn.close()
         continue
 
     try:
-        sourceCode = getFromDict(key='source', D=D, require=True, connection=conn, errorMessage='No source code', loggingMessage=' > Error: No source code.')
+        #Get source code
+        sourceCode = getFromDict(key='source', D=D, errorMessage='No source code', logger=logger)
         if sourceCode is None:
-            continue
-
-        stdin = getFromDict(key='stdin', D=D, default='')
-
-        fileName = getFromDict(key='name', D=D, default='a.cpp')
-
-        runningTimeLimit = int(getFromDict(key='time_limit', D=D, default=5))
-
-        memoryLimit = int(getFromDict(key='memory_limit', D=D, default=128))
-
-        memoryLimitStrict = ''
-        if bool(getFromDict(key='memory_limit_strict', D=D, default=False)):
-            memoryLimitStrict = '--strict '
-
-        filetype = getFromDict(key='mime', D=D, require=True, connection=conn,
-                errorMessage='The language is currently not supported', loggingMessage=' Bad req: no file type.')
-        if filetype is None:
-            continue
-
-        if filetype not in supportType:
-            print ' Bad req: not supported.', D['mime']
-            sendResponse(conn, json.dumps({
-                'state': 'error',
-                'stdout': '',
-                'stderr': D['mime'] + ' is currently not supported.'
-            }))
             conn.close()
             continue
 
-        stage = getFromDict(key='stage', D=D, require=True, connection=conn,
-                errorMessage='Specify \'stage\'', loggingMessage=' Bad req: no stage')
-        if stage is None:
+        print '--------------------------------------------------'
+        print sourceCode
+        with open('temp.cpp', 'w') as tempfp:
+            tempfp.write(sourceCode)
+        print '--------------------------------------------------'
+
+        #Get stdin string
+        stdin = getFromDict(key='stdin', D=D, default='')
+
+        #Get file name
+        fileName = getFromDict(key='name', D=D, default='a.cpp')
+
+        #Get running time limit
+        try:
+            runningTimeLimit = int(getFromDict(key='time_limit', D=D, default=5))
+        except ValueError as verr:
+            logger.error('running time limit value error. ' + str(e))
+            sendResponse(conn, state='error', stdout='', stderr='Running time limit value is not an acceptable form. It should be only a integer.', logger=logger)
+        except Exception as e:
+            logger.critical(str(e))
+            sendResponse(conn, state='error', stdout='', stderr='Server error.', logger=logger)
+
+        #Get memory limit
+        try:
+            memoryLimit = int(getFromDict(key='memory_limit', D=D, default=128))
+        except ValueError as verr:
+            logger.error('memory limit value error. ' + str(e))
+            sendResponse(conn, state='error', stdout='', stderr='Memory limit value is not an acceptable form.', logger=logger)
+        except Exception as e:
+            logger.critical(str(e))
+            sendResponse(conn, state='error', stdout='', stderr='Server error.', logger=logger)
+
+        #Get if memory_strict option is on
+        try:
+            isStrict = bool(getFromDict(key='memory_limit_strict', D=D, default=False))
+        except ValueError as verr:
+            logger.error('memory limit value error. ' + str(e))
+            sendResponse(conn, state='error', stdout='', stderr='Memory_limit_strict is not an acceptable form.', logger=logger)
+        except Exception as e:
+            logger.critical(str(e))
+            sendResponse(conn, state='error', stdout='', stderr='Server error.', logger=logger)
+
+        #Set memory_strict string
+        memoryLimitStrict = ''
+        if isStrict:
+            memoryLimitStrict = '--strict '
+
+        #Get mime (file type)
+        filetype = getFromDict(key='mime', D=D, errorMessage='The language should be specified.', logger=logger)
+        if filetype is None:
+            conn.close()
             continue
+
+        #See if the type is supported
+        if filetype not in supportType:
+            logger.warning('Bad request: ' + str(D['mime']) + ' not supported.')
+            sendResponse(conn, state='error', stdout='', stderr=D['mime'] + ' is currently not supported.', logger=logger)
+            conn.close()
+            continue
+
+        #Get which stage should be done
+        stage = getFromDict(key='stage', D=D, errorMessage='Specify \'stage\'', logger=logger)
+        if stage is None:
+            conn.close()
+            continue
+
+        #See if the stage is invalid
         if stage != 'compile' and stage != 'run':
-            print ' Bad req: invalid stage.'
-            sendResponse(conn, json.dumps({
-                'state': 'error',
-                'stdout': '',
-                'stderr': 'Invalid value in \'stage\''
-            }))
+            logger.warning('Bad request: invalid stage')
+            sendResponse(conn, state='error', stdout='', stderr='Invalid value in \'stage\'', logger=logger)
+            conn.close()
+            continue
+
+        #make temp directory
+        try:
+            dirpath = tempfile.mkdtemp()
+        except Exception as e:
+            logger.critical('Cannot write source code. ' + str(e))
+            sendResponse(conn, state='error', stdout='', stderr='Server error.', logger=logger)
             conn.close()
             continue
 
         try:
-            #make temp directory
-            dirpath = tempfile.mkdtemp()
             with open(dirpath + '/' + fileName, 'w') as fp:
                 fp.write(sourceCode)
             #make the file to be redirected as stdin
             with open(dirpath + '/stdin.txt', 'w') as fp:
                 fp.write(stdin)
         except Exception as e:
-            print(' > Error: Cannot write source code.', e)
-            sendResponse(conn, json.dumps({
-                'state': 'error',
-                'stdout': '',
-                'stderr': 'Server error.'
-            }))
+            logger.critical('Cannot write source code or stdin file. ' + str(e))
+            sendResponse(conn, state='error', stdout='', stderr='Server error.', logger=logger)
             conn.close()
             continue
 
         #compile
-        if filetype != 'text/x-python':
+        if filetype not in noCompileType:
             command = './compile_cpp.sh -v ' + dirpath + ':' + '/data ' + fileName
             result = execute(command, timeLimit = 5, extraMessage = 'Compile')
+
             if result['state'] == 'tle':
-                sendResponse(conn, json.dumps({
-                    'state': 'error',
-                    'stdout': '',
-                    'stderr': 'Compile time limit exceeded.'
-                }))
+                logger.info('TLE')
+                sendResponse(conn, state='error', stdout='', stderr='Compile time limit exceeded.', logger=logger)
                 conn.close()
                 continue
             elif result['stderr'] != '':
-                print ' > Error:', result['stderr']
-                sendResponse(conn, json.dumps({
-                    'state': 'compile error',
-                    'stdout': result['stdout'],
-                    'stderr': result['stderr']
-                }))
+                logger.error(result['stderr'])
+                sendResponse(conn, state='compile error', stdout=result['stdout'], stderr=result['stderr'], logger=logger)
                 conn.close()
                 continue
 
@@ -187,18 +236,29 @@ while True:
                 try:
                     shutil.rmtree(dirpath)
                 except Exception as e:
-                    print ' > Error: Cannot remove dir.', e
-                print ' > Success'
-                sendResponse(conn, json.dumps({
-                    'state': 'success',
-                    'stdout': result['stdout'],
-                    'stderr': result['stderr']
-                }))
+                    logger.error('Cannot remove dir. (' + dirpath + ') ' + str(e))
+                    logger.info('Compile success')
+                    sendResponse(conn, state='success', stdout=result['stdout'], stderr=result['stderr'], logger=logger)
+                    conn.close()
+                    continue
+                sendResponse(conn, state='success', stdout=result['stdout'], stderr=result['stderr'], logger = logger)
                 conn.close()
                 continue
 
+            #Block until file writing done
+            compileSuccess = True
+            start = time.time()
             while not os.path.isfile(dirpath + '/a.out') or not bool(os.stat(dirpath + '/a.out').st_mode & stat.S_IXUSR):
+                #no more than 5 secs
+                if time.time() > start + 5:
+                    compileSuccess = False
+                    break
                 time.sleep(0.1)
+            if not compileSuccess:
+                logger.critical('Cannot write binary file.')
+                sendResponse(conn, state='error', stdout='', stderr='Server error.', logger=logger)
+                conn.close()
+                continue
 
         #run
         if filetype == 'text/x-python':
@@ -208,37 +268,25 @@ while True:
 
         result = execute(command, timeLimit = runningTimeLimit + 4, extraMessage = 'Running')
         if result['state'] == 'tle':
-            print ' > tle'
-            sendResponse(conn, json.dumps({
-                'state': 'tle',
-                'stdout': '',
-                'stderr': 'Time limit exceeded.'
-            }))
+            logger.info('TLE')
+            sendResponse(conn, state='tle', stdout='', stderr='Time limit exceeded.', logger=logger)
             conn.close()
             continue
         elif result['stderr'] != '':
-            print ' > Error:', result['stderr']
-            sendResponse(conn, json.dumps({
-                'state': 'error',
-                'stdout': '',
-                'stderr': result['stderr']
-            }))
+            logger.error(result['stderr'])
+            sendResponse(conn, state='error', stdout='', stderr=result['stderr'], logger=logger)
             conn.close()
             continue
 
-        print ' > sucess'
-        sendResponse(conn, json.dumps({
-            'state': 'success',
-            'stdout': result['stdout'],
-            'stderr': result['stderr']
-        }))
+        logger.info('Run success')
+        sendResponse(conn, state='success', stdout=result['stdout'], stderr=result['stderr'], logger=logger)
         conn.close()
+
     except Exception as e:
-        print " > Unknown exception:", e
-        pass
+        logger.critical('Unknown exception.s ' + str(e))
 
     try:
         shutil.rmtree(dirpath)
     except Exception as e:
-        print ' > Error: Cannot remove dir.', e
+        logger.error('Cannot remove dir. (' + dirpath + ') ' + str(e))
 
