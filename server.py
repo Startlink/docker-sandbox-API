@@ -3,12 +3,12 @@ import json
 import tempfile
 import shutil
 import subprocess
-from docker import Client
 import time
 import os
 import stat
 import logging
 import datetime
+import cpp
 
 def execute(commmand, timeLimit = 5, extraMessage = ''):
     kwargs = {
@@ -122,11 +122,8 @@ while True:
             conn.close()
             continue
 
-        print '--------------------------------------------------'
-        print sourceCode
         with open('temp.cpp', 'w') as tempfp:
             tempfp.write(sourceCode)
-        print '--------------------------------------------------'
 
         #Get stdin string
         stdin = getFromDict(key='stdin', D=D, default='')
@@ -165,9 +162,9 @@ while True:
             sendResponse(conn, state='error', stdout='', stderr='Server error.', logger=logger)
 
         #Set memory_strict string
-        memoryLimitStrict = ''
+        memorySwapLimit = memoryLimit * 2
         if isStrict:
-            memoryLimitStrict = '--strict '
+            memoryLimitStrict = memoryLimit
 
         #Get mime (file type)
         filetype = getFromDict(key='mime', D=D, errorMessage='The language should be specified.', logger=logger)
@@ -218,17 +215,10 @@ while True:
 
         #compile
         if filetype not in noCompileType:
-            command = './compile_cpp.sh -v ' + dirpath + ':' + '/data ' + fileName
-            result = execute(command, timeLimit = 5, extraMessage = 'Compile')
+            result = cpp.compile(sourceFile=[fileName], volumn = dirpath + ':' + '/data', compilerName = 'g++', option='-std=c++0x -Wall', binaryName = 'a.out', imageName = 'cpp', timeLimit = 5, logger = logger)
 
-            if result['state'] == 'tle':
-                logger.info('TLE')
-                sendResponse(conn, state='error', stdout='', stderr='Compile time limit exceeded.', logger=logger)
-                conn.close()
-                continue
-            elif result['stderr'] != '':
-                logger.error(result['stderr'])
-                sendResponse(conn, state='compile error', stdout=result['stdout'], stderr=result['stderr'], logger=logger)
+            if result['state'] != 'success':
+                sendResponse(conn, state=result['state'], stdout=result['stdout'], stderr=result['stderr'], logger=logger)
                 conn.close()
                 continue
 
@@ -264,17 +254,11 @@ while True:
         if filetype == 'text/x-python':
             command = './run_py.sh --stdin ' + dirpath + '/stdin.txt ' + '-m ' + str(memoryLimit) + ' ' + memoryLimitStrict + '-v '+ dirpath + ':' + '/data ' + '/data/' + fileName
         else:
-            command = './run_cpp.sh --stdin ' + dirpath + '/stdin.txt ' + '-m ' + str(memoryLimit) + ' ' + memoryLimitStrict + '-v ' + dirpath + ':' + '/data ' + '/data/a.out'
+            result = cpp.run(volumn = dirpath + ':' + '/data', binaryName='a.out', imageName='cpp', memoryLimit = memoryLimit, memorySwapLimit = memorySwapLimit, stdinName = 'stdin.txt', timeLimit = runningTimeLimit+2, logger= logger)
 
-        result = execute(command, timeLimit = runningTimeLimit + 4, extraMessage = 'Running')
-        if result['state'] == 'tle':
-            logger.info('TLE')
-            sendResponse(conn, state='tle', stdout='', stderr='Time limit exceeded.', logger=logger)
-            conn.close()
-            continue
-        elif result['stderr'] != '':
-            logger.error(result['stderr'])
-            sendResponse(conn, state='error', stdout='', stderr=result['stderr'], logger=logger)
+        if result['state'] != 'success':
+            logger.info('Run failed: ' + result['stderr'])
+            sendResponse(conn, state=result['state'], stdout=result['stdout'], stderr=result['stderr'], logger=logger)
             conn.close()
             continue
 

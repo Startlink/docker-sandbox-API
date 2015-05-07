@@ -5,3 +5,5 @@ temp.*
 *.out
 *.cpp
 *.log
+*.pyc
+*.txt
