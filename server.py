@@ -8,7 +8,8 @@ import os
 import stat
 import logging
 import datetime
-import cpp
+import cpp as cppContainer
+import python as pythonContainer
 
 def execute(commmand, timeLimit = 5, extraMessage = ''):
     kwargs = {
@@ -63,7 +64,23 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind((HOST, PORT))
 
-supportType = ['text/x-c++src', 'text/x-python']
+supportType = ['text/x-c++src', 'text/x-python', 'text/x-java']
+compilerName = {
+    'text/x-c++src': 'g++',
+    'text/x-java': 'javac'
+}
+compileOption = {
+    'text/x-c++src': '-std=c++0x -Wall',
+    'text/x-java': ''
+}
+compileBinaryName = {
+    'text/x-c++src': 'a.out',
+    'text/x-java': None
+}
+dockerImageName = {
+    'text/x-c++src': 'cpp',
+    'text/x-java': 'java'
+}
 #mime list for the languages that do not need compile:
 noCompileType = ['text/x-python']
 
@@ -161,7 +178,7 @@ while True:
             logger.critical(str(e))
             sendResponse(conn, state='error', stdout='', stderr='Server error.', logger=logger)
 
-        #Set memory_strict string
+        #Set memory limit and memory swap limit
         memorySwapLimit = memoryLimit * 2
         if isStrict:
             memoryLimitStrict = memoryLimit
@@ -215,7 +232,10 @@ while True:
 
         #compile
         if filetype not in noCompileType:
-            result = cpp.compile(sourceFile=[fileName], volumn = dirpath + ':' + '/data', compilerName = 'g++', option='-std=c++0x -Wall', binaryName = 'a.out', imageName = 'cpp', timeLimit = 5, logger = logger)
+            result = cppContainer.compile(sourceFile=[fileName], volumn = dirpath + ':' + '/data',
+                    compilerName = compilerName[filetype], option=compileOption[filetype],
+                    binaryName = compileBinaryName[filetype],
+                    imageName = dockerImageName[filetype], timeLimit = 5, logger = logger)
 
             if result['state'] != 'success':
                 sendResponse(conn, state=result['state'], stdout=result['stdout'], stderr=result['stderr'], logger=logger)
@@ -252,9 +272,17 @@ while True:
 
         #run
         if filetype == 'text/x-python':
-            command = './run_py.sh --stdin ' + dirpath + '/stdin.txt ' + '-m ' + str(memoryLimit) + ' ' + memoryLimitStrict + '-v '+ dirpath + ':' + '/data ' + '/data/' + fileName
+            result = pythonContainer.run(sourceFileName=fileName, volumn=dirpath+':/data',
+                memoryLimit = memoryLimit, memorySwapLimit = memorySwapLimit,
+                timeLimit = runningTimeLimit+2, logger= logger)
         else:
-            result = cpp.run(volumn = dirpath + ':' + '/data', binaryName='a.out', imageName='cpp', memoryLimit = memoryLimit, memorySwapLimit = memorySwapLimit, stdinName = 'stdin.txt', timeLimit = runningTimeLimit+2, logger= logger)
+            binaryName = compileBinaryName[filetype]
+            if filetype == 'text/x-java':
+                binaryName = fileName[:fileName.rfind('.')]
+            result = cppContainer.run(volumn = dirpath + ':/data',
+                binaryName=binaryName, imageName='cpp', stdinName = 'stdin.txt',
+                memoryLimit = memoryLimit, memorySwapLimit = memorySwapLimit,
+                timeLimit = runningTimeLimit+2, logger= logger)
 
         if result['state'] != 'success':
             logger.info('Run failed: ' + result['stderr'])
@@ -273,4 +301,6 @@ while True:
         shutil.rmtree(dirpath)
     except Exception as e:
         logger.error('Cannot remove dir. (' + dirpath + ') ' + str(e))
-
+        if conn:
+            sendResponse(conn, state='success', stdout=result['stdout'], stderr=result['stderr'], logger=logger)
+            conn.close()

@@ -19,10 +19,12 @@ def compile(sourceFile, volumn, compilerName = 'g++', option='-std=c++0x', binar
     fileNames = containerVolumn + sourceFile[0]
     for source in sourceFile[1:]:
         fileNames = fileNames + ' ' + containerVolumn + source
-    
-    binaryName = containerVolumn + binaryName
+    if binaryName is not None:
+        binaryName = '-o ' + containerVolumn + binaryName
+    else:
+        binaryName = ''
 
-    command = "-v %s %s sh -c '%s %s -o %s %s'" % (volumn, imageName, compilerName, option, binaryName, fileNames)
+    command = "-v %s %s sh -c '%s %s %s %s'" % (volumn, imageName, compilerName, option, binaryName, fileNames)
 
     D = dockerContainer.execute(command, timeLimit, logger)
 
