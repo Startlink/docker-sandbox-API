@@ -2,40 +2,10 @@ import socket
 import json
 import tempfile
 import shutil
-import subprocess
 import time
 import os
-import stat
 import logging
 import datetime
-import cpp as cppContainer
-import python as pythonContainer
-
-def execute(commmand, timeLimit = 5, extraMessage = ''):
-    kwargs = {
-            "stdout": subprocess.PIPE,
-            "stderr": subprocess.PIPE,
-            "shell": True
-    }
-    popen = subprocess.Popen(command, **kwargs)
-    start = time.time()
-    while time.time() < start + timeLimit and popen.poll() is None:
-        time.sleep(0.1)
-    wait = popen.poll()
-
-    if wait is None:
-        popen.kill()
-        return {
-            'state': 'tle',
-            'stdout': '',
-            'stderr': extraMessage + 'Time Limit Exceeded'
-        }
-
-    return {
-        'state': wait,
-        'stdout': popen.stdout.read(),
-        'stderr': popen.stderr.read()
-    }
 
 def sendResponse(conn, state, stdout, stderr, logger):
     res = json.dumps({ 'state': state, 'stdout': stdout, 'stderr': stderr })
@@ -65,24 +35,15 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind((HOST, PORT))
 
 supportType = ['text/x-c++src', 'text/x-python', 'text/x-java']
-compilerName = {
-    'text/x-c++src': 'g++',
-    'text/x-java': 'javac'
-}
-compileOption = {
-    'text/x-c++src': '-std=c++0x -Wall',
-    'text/x-java': ''
-}
-compileBinaryName = {
-    'text/x-c++src': 'a.out',
-    'text/x-java': None
-}
-dockerImageName = {
-    'text/x-c++src': 'cpp',
-    'text/x-java': 'java'
-}
 #mime list for the languages that do not need compile:
 noCompileType = ['text/x-python']
+
+#IP blocking activation
+ipBlock = True
+
+#configure compile/run fuctions and arguments
+from languageConfigure import *
+
 
 #Configure logger
 logger = logging.getLogger('sever')
@@ -110,7 +71,7 @@ while True:
     logger.info('Connected by ' + str(addr))
 
     #Block ip except for our web server
-    if addr[0] != '115.68.182.172':
+    if ipBlock == True and addr[0] != '115.68.182.172':
         logger.warning('Unauthorized connection by ' + str(addr))
 
         sendResponse(conn, state='error', stdout='', stderr='Connection refused', logger=logger)
@@ -146,7 +107,7 @@ while True:
         stdin = getFromDict(key='stdin', D=D, default='')
 
         #Get file name
-        fileName = getFromDict(key='name', D=D, default='a.cpp')
+        fileName = getFromDict(key='filename', D=D, default='a.cpp')
 
         #Get running time limit
         try:
@@ -232,10 +193,10 @@ while True:
 
         #compile
         if filetype not in noCompileType:
-            result = cppContainer.compile(sourceFile=[fileName], volumn = dirpath + ':' + '/data',
-                    compilerName = compilerName[filetype], option=compileOption[filetype],
-                    binaryName = compileBinaryName[filetype],
-                    imageName = dockerImageName[filetype], timeLimit = 5, logger = logger)
+            result = compileCallingFunction[filetype](
+                    sourceFile=[fileName], volumn = dirpath+':/data',
+                    logger=logger,
+                    **compileKwargs[filetype])
 
             if result['state'] != 'success':
                 sendResponse(conn, state=result['state'], stdout=result['stdout'], stderr=result['stderr'], logger=logger)
@@ -255,34 +216,32 @@ while True:
                 conn.close()
                 continue
 
+            binaryName = getFromDict(D=compileKwargs[filetype], key='binaryName', default=None)
+            if binaryName is None:
+                binaryName = fileName[:fileName.rfind('.')] + '.class'
+            print ' >', binaryName
+
             #Block until file writing done
-            compileSuccess = True
-            start = time.time()
-            while not os.path.isfile(dirpath + '/a.out') or not bool(os.stat(dirpath + '/a.out').st_mode & stat.S_IXUSR):
-                #no more than 5 secs
-                if time.time() > start + 5:
-                    compileSuccess = False
-                    break
-                time.sleep(0.1)
-            if not compileSuccess:
+            if not isFileWritingDone(dirpath+'/'+binaryName,
+                    checkXMode=ifTheBinaryFileNeedsXMode[filetype],
+                    blockTimeLimit=2):
                 logger.critical('Cannot write binary file.')
                 sendResponse(conn, state='error', stdout='', stderr='Server error.', logger=logger)
                 conn.close()
                 continue
 
         #run
+        runName = 'a.out'
         if filetype == 'text/x-python':
-            result = pythonContainer.run(sourceFileName=fileName, volumn=dirpath+':/data',
-                memoryLimit = memoryLimit, memorySwapLimit = memorySwapLimit,
-                timeLimit = runningTimeLimit+2, logger= logger)
-        else:
-            binaryName = compileBinaryName[filetype]
-            if filetype == 'text/x-java':
-                binaryName = fileName[:fileName.rfind('.')]
-            result = cppContainer.run(volumn = dirpath + ':/data',
-                binaryName=binaryName, imageName='cpp', stdinName = 'stdin.txt',
-                memoryLimit = memoryLimit, memorySwapLimit = memorySwapLimit,
-                timeLimit = runningTimeLimit+2, logger= logger)
+            runName = '/data/'+fileName
+        elif filetype == 'text/x-java':
+            runName = fileName[:fileName.rfind('.')]
+        result = runCallingFunction[filetype](
+                runName = runName,
+                stdinName = 'stdin.txt',
+                volumn=dirpath+':/data', memoryLimit=memoryLimit, memorySwapLimit=memorySwapLimit,
+                timeLimit = runningTimeLimit+2, logger = logger,
+                **runKwargs[filetype])
 
         if result['state'] != 'success':
             logger.info('Run failed: ' + result['stderr'])

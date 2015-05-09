@@ -5,7 +5,7 @@ Port: 3000
 ### Request
 json
 * 'stage':'compile' or 'run'
-* 'mime': 'text/x-c++src'
+* 'mime': 'text/x-c++src', 'text/x-java', 'text/x-python'
 * 'filename': source file name
 * 'stdin': stdin 문자열
 * 'source': 소스코드 문자열

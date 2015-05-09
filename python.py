@@ -11,11 +11,12 @@ def getVolumnPath(S):
         hostVolumn = hostVolumn + '/'
     return (hostVolumn, containerVolumn)
 
-def run(sourceFileName, volumn, option='', intpName='python', imageName='python', memoryLimit=128, memorySwapLimit=256, stdinName='stdin.txt', timeLimit=5, logger=None):
+def run(runName, volumn, option='', intpName='python', imageName='python', memoryLimit=128, memorySwapLimit=256, stdinName='stdin.txt', timeLimit=5, logger=None):
     (hostVolumn, containerVolumn) = getVolumnPath(volumn)
 
     #Run
-    command = "-v %s --net none --memory %dm --memory-swap %dm %s sh -c '%s %s %s < %s'" % (volumn, memoryLimit, memorySwapLimit, imageName, intpName, option, containerVolumn+sourceFileName, containerVolumn+stdinName)
+    command = "-v %s --net none --memory %dm --memory-swap %dm %s sh -c '%s %s %s < %s'" % (volumn, memoryLimit, memorySwapLimit, imageName, intpName, option, runName, containerVolumn+stdinName)
+    logger.debug(command)
     D = dockerContainer.execute(command, timeLimit, logger)
 
     exitCode = D['exitcode']

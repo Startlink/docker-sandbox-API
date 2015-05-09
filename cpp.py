@@ -25,6 +25,7 @@ def compile(sourceFile, volumn, compilerName = 'g++', option='-std=c++0x', binar
         binaryName = ''
 
     command = "-v %s %s sh -c '%s %s %s %s'" % (volumn, imageName, compilerName, option, binaryName, fileNames)
+    logger.debug(command)
 
     D = dockerContainer.execute(command, timeLimit, logger)
 
@@ -50,17 +51,17 @@ def compile(sourceFile, volumn, compilerName = 'g++', option='-std=c++0x', binar
         res['stdout'] = ''
         res['stderr'] = 'Server error.'
         if logger is not None:
-            logger.critical('Error while compile: ' + res['stderr'])
+            logger.critical('Error while compile: ' + D['stderr'])
         else:
-            print 'Error while compile: ' + res['stderr']
+            print 'Error while compile: ' + D['stderr']
 
     return res
 
-def run(volumn, compilerName = 'g++', option='-std=c++0x', binaryName='a.out', imageName='cpp', memoryLimit=128, memorySwapLimit=256, stdinName='stdin.txt', timeLimit=5, logger=None):
+def run(volumn, compilerName = 'g++', option='-std=c++0x', runName='a.out', imageName='cpp', memoryLimit=128, memorySwapLimit=256, stdinName='stdin.txt', timeLimit=5, logger=None):
     (hostVolumn, containerVolumn) = getVolumnPath(volumn)
 
     #Run
-    command = "-v %s --net none --memory %dm --memory-swap %dm %s sh -c '%s < %s'" % (volumn, memoryLimit, memorySwapLimit, imageName, containerVolumn+binaryName, containerVolumn+stdinName)
+    command = "-v %s --net none --memory %dm --memory-swap %dm %s sh -c '%s < %s'" % (volumn, memoryLimit, memorySwapLimit, imageName, containerVolumn+runName, containerVolumn+stdinName)
     D = dockerContainer.execute(command, timeLimit, logger)
 
     exitCode = D['exitcode']
