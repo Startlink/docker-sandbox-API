@@ -34,10 +34,6 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind((HOST, PORT))
 
-supportType = ['text/x-c++src', 'text/x-python', 'text/x-java']
-#mime list for the languages that do not need compile:
-noCompileType = ['text/x-python']
-
 #IP blocking activation
 ipBlock = True
 
