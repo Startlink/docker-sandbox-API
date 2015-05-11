@@ -1,12 +1,12 @@
-import cpp as cppContainer
-import python as pythonContainer
+import compileLanguage
+import interpreterLanguage
 import time
 import os
 import stat
 
 compileCallingFunction = {
-    'text/x-c++src': cppContainer.compile,
-    'text/x-java': cppContainer.compile
+    'text/x-c++src': compileLanguage.compile,
+    'text/x-java': compileLanguage.compile
 }
 compileKwargs = {
     'text/x-c++src': {
@@ -24,9 +24,9 @@ compileKwargs = {
 }
 
 runCallingFunction = {
-    'text/x-c++src': cppContainer.run,
-    'text/x-java': pythonContainer.run,
-    'text/x-python': pythonContainer.run
+    'text/x-c++src': compileLanguage.run,
+    'text/x-java': interpreterLanguage.run,
+    'text/x-python': interpreterLanguage.run
 }
 runKwargs = {
     'text/x-c++src': {
