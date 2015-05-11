@@ -78,7 +78,7 @@ while True:
         conn.close()
         continue
 
-    data = conn.recv(1024)
+    data = conn.recv(8192)
     if not data:
         continue
     logger.debug(str(data))
