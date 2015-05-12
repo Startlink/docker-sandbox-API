@@ -15,13 +15,13 @@ def run(runName, volumn, option='', intpName='python', imageName='python', memor
     (hostVolumn, containerVolumn) = getVolumnPath(volumn)
 
     #Run
-    command = "-v %s --net none --memory %dm --memory-swap %dm %s sh -c '%s %s %s < %s'" % (volumn, memoryLimit, memorySwapLimit, imageName, intpName, option, runName, containerVolumn+stdinName)
+    command = "-v %s --net none --memory %sm --memory-swap %sm %s sh -c '%s %s %s < %s'" % (volumn, str(memoryLimit), str(memorySwapLimit), imageName, intpName, option, runName, containerVolumn+stdinName)
     logger.debug(command)
     D = dockerContainer.execute(command, timeLimit, logger)
 
     exitCode = D['exitcode']
     if logger is not None:
-        logger.info('Run done. (exit code: %d)' % exitCode)
+        logger.info('Run done. (exit code: %s)' % str(exitCode))
 
     res = {}
     if exitCode == 0:

@@ -68,6 +68,7 @@ consoleHandler.setFormatter(formatter)
 logger.addHandler(fileHandler)
 logger.addHandler(consoleHandler)
 
+conn = None
 
 while True:
     s.listen(5) #maximum number of queued connections
@@ -246,7 +247,7 @@ while True:
                 runName = runName,
                 stdinName = 'stdin.txt',
                 volumn=dirpath+':/data', memoryLimit=memoryLimit, memorySwapLimit=memorySwapLimit,
-                timeLimit = runningTimeLimit+2, logger = logger,
+                timeLimit = runningTimeLimit, logger = logger,
                 **runKwargs[filetype])
 
         if result['state'] != 'success':
@@ -261,7 +262,8 @@ while True:
 
     except Exception as e:
         logger.critical('Unknown exception.s ' + str(e))
-
+        if conn:
+            sendResponse(conn, state='error', stdout='', stderr='Server error.', logger=logger)
     try:
         shutil.rmtree(dirpath)
     except Exception as e:

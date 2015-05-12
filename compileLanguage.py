@@ -31,7 +31,7 @@ def compile(sourceFile, volumn, compilerName = 'g++', option='-std=c++0x', binar
 
     exitCode = D['exitcode']
     if logger is not None:
-        logger.info('Compile done. (exit code: %d)' % exitCode)
+        logger.info('Compile done. (exit code: %s)' % str(exitCode))
 
     res = {}
     if exitCode == 0:
@@ -61,12 +61,12 @@ def run(volumn, compilerName = 'g++', option='-std=c++0x', runName='a.out', imag
     (hostVolumn, containerVolumn) = getVolumnPath(volumn)
 
     #Run
-    command = "-v %s --net none --memory %dm --memory-swap %dm %s sh -c '%s < %s'" % (volumn, memoryLimit, memorySwapLimit, imageName, containerVolumn+runName, containerVolumn+stdinName)
+    command = "-v %s --net none --memory %sm --memory-swap %sm %s sh -c '%s < %s'" % (volumn, str(memoryLimit), str(memorySwapLimit), imageName, containerVolumn+runName, containerVolumn+stdinName)
     D = dockerContainer.execute(command, timeLimit, logger)
 
     exitCode = D['exitcode']
     if logger is not None:
-        logger.info('Run done. (exit code: %d)' % exitCode)
+        logger.info('Run done. (exit code: %s)' % str(exitCode))
 
     res = {}
     if exitCode == 0:
