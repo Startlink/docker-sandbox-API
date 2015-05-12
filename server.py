@@ -1,3 +1,4 @@
+#-*- coding: utf8 -*-
 import sys
 import socket
 import json
@@ -101,20 +102,17 @@ while True:
         continue
 
     try:
+        #Get file name
+        fileName = getFromDict(key='filename', D=D, default='a.cpp')
+
         #Get source code
         sourceCode = getFromDict(key='source', D=D, errorMessage='No source code', logger=logger)
         if sourceCode is None:
             conn.close()
             continue
 
-        with open('temp.cpp', 'w') as tempfp:
-            tempfp.write(sourceCode)
-
         #Get stdin string
         stdin = getFromDict(key='stdin', D=D, default='')
-
-        #Get file name
-        fileName = getFromDict(key='filename', D=D, default='a.cpp')
 
         #Get running time limit
         try:
@@ -188,10 +186,10 @@ while True:
 
         try:
             with open(dirpath + '/' + fileName, 'w') as fp:
-                fp.write(sourceCode)
+                fp.write(sourceCode.encode('utf8'))
             #make the file to be redirected as stdin
             with open(dirpath + '/stdin.txt', 'w') as fp:
-                fp.write(stdin)
+                fp.write(stdin.encode('utf8'))
         except Exception as e:
             logger.critical('Cannot write source code or stdin file. ' + str(e))
             sendResponse(conn, state='error', stdout='', stderr='Server error.', logger=logger)

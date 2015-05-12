@@ -1,3 +1,4 @@
+#-*- coding: utf8 -*-
 import compileLanguage
 import interpreterLanguage
 import time
@@ -28,7 +29,7 @@ compileKwargs = {
     },
     'text/x-java': {
         'compilerName': 'javac',
-        'option': '-d /data',
+        'option': '-encoding UTF-8 -d /data',
         'binaryName': None,
         'imageName': 'java'
     }
@@ -49,7 +50,7 @@ runKwargs = {
     },
     'text/x-python': { },
     'text/x-java': {
-        'option': '-classpath /data',
+        'option': '-Dfile.encoding=UTF-8 -classpath /data',
         'intpName': 'java',
         'imageName': 'java'
     }
