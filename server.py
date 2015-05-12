@@ -1,3 +1,4 @@
+import sys
 import socket
 import json
 import tempfile
@@ -30,12 +31,18 @@ def getFromDict(key, D, default='', errorMessage=None, logger=None):
 
 HOST = ''
 PORT = 3000
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-s.bind((HOST, PORT))
 
 #IP blocking activation
 ipBlock = True
+
+if len(sys.argv) >= 2:
+    PORT = int(sys.argv[1])
+if len(sys.argv) >= 3:
+    ipBlock = bool(int(sys.argv[2]))
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind((HOST, PORT))
 
 #configure compile/run fuctions and arguments
 from languageConfigure import *
@@ -45,7 +52,10 @@ from languageConfigure import *
 logger = logging.getLogger('sever')
 logger.setLevel(logging.DEBUG)
 
-fileHandler = logging.FileHandler('server_' + datetime.datetime.now().strftime('%Y%m%d%H%M%S') + '.log')
+#make logfile directory
+if not os.path.exists('log'):
+    os.makedirs('log')
+fileHandler = logging.FileHandler('log/server_' + datetime.datetime.now().strftime('%Y%m%d%H%M%S') + '.log')
 fileHandler.setLevel(logging.WARNING)
 
 consoleHandler = logging.StreamHandler()
