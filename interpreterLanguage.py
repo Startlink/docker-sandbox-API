@@ -12,7 +12,7 @@ def getVolumnPath(S):
         hostVolumn = hostVolumn + '/'
     return (hostVolumn, containerVolumn)
 
-def run(runName, volumn, option='', intpName='python', imageName='python', memoryLimit=128, memorySwapLimit=256, stdinName='stdin.txt', timeLimit=5, logger=None):
+def run(runName, volumn, option='', intpName='python', imageName='baekjoon/onlinejudge-gcc:4.8', memoryLimit=128, memorySwapLimit=256, stdinName='stdin.txt', timeLimit=5, logger=None):
     (hostVolumn, containerVolumn) = getVolumnPath(volumn)
 
     #Run

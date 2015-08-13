@@ -19,19 +19,19 @@ compileKwargs = {
         'compilerName': 'g++',
         'option': '-O2 -Wall -lm --static -std=c++11',
         'binaryName': 'a.out',
-        'imageName': 'cpp'
+        'imageName': 'baekjoon/onlinejudge-gcc:4.8'
     },
     'text/x-csrc':{
         'compilerName': 'gcc',
         'option': '-O2 -Wall -lm --static -std=c99',
         'binaryName': 'a.out',
-        'imageName': 'cpp'
+        'imageName': 'baekjoon/onlinejudge-gcc:4.8'
     },
     'text/x-java': {
         'compilerName': 'javac',
         'option': '-encoding UTF-8 -d /data',
         'binaryName': None,
-        'imageName': 'java'
+        'imageName': 'baekjoon/onlinejudge-java:1.7'
     }
 }
 
@@ -43,16 +43,18 @@ runCallingFunction = {
 }
 runKwargs = {
     'text/x-c++src': {
-        'imageName': 'cpp',
+        'imageName': 'baekjoon/onlinejudge-gcc:4.8'
     },
     'text/x-csrc': {
-        'imageName': 'cpp'
+        'imageName': 'baekjoon/onlinejudge-gcc:4.8'
     },
-    'text/x-python': { },
+    'text/x-python': { 
+        'imageName': 'baekjoon/onlinejudge-gcc:4.8'
+    },
     'text/x-java': {
         'option': '-Dfile.encoding=UTF-8 -classpath /data',
         'intpName': 'java',
-        'imageName': 'java'
+        'imageName': 'baekjoon/onlinejudge-java:1.7'
     }
 }
 ifTheBinaryFileNeedsXMode = {
